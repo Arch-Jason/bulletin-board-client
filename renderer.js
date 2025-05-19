@@ -4,12 +4,12 @@ let bulletinListNumber = 0;
 async function fetchData() {
     try {
         const htmlResponse = await fetch(
-            `http://localhost:3000/api/GetLatestRecord`
+            `http://152.32.175.98:3000/api/GetLatestRecord`
         );
         const htmlData = await htmlResponse.json();
         bulletinListNumber = htmlData.length;
         const treeholeHttpResponse = await fetch(
-            `http://localhost:3000/api/GetTreeholeRecord`
+            `http://152.32.175.98:3000/api/GetTreeholeRecord`
         );
 
         const treeholeHtmlData = await treeholeHttpResponse.json();
@@ -53,7 +53,7 @@ async function sendFeedback(id, isPositive) {
 
     try {
         const response = await fetch(
-            "http://localhost:3000/api/treeholeFeedbackInc",
+            "http://152.32.175.98:3000/api/treeholeFeedbackInc",
             {
                 method: "POST",
                 headers: {
@@ -89,9 +89,10 @@ function init() {
         if (currentIndex > bulletinListNumber - 1) {
             console.log(firstTreeholeRecordId, currentIndex, bulletinListNumber)
             const id = firstTreeholeRecordId + currentIndex - bulletinListNumber
-            if (await window.sys.readButtons() === 1) {
+            const buttonStates = await window.sys.readButtons()
+            if (buttonStates === 1) {
                 sendFeedback(id, true)
-            } else if (await window.sys.readButtons() === 2) {
+            } else if (buttonStates === 2) {
                 sendFeedback(id, false)
             }
         }

@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('node:path')
-const { buttonFeedback } = require('./feedbackHandler.mjs')
+const { buttonFeedback } = require("./feedbackHandler.cjs")
 
 const createWindow = () => {
   const win = new BrowserWindow({
@@ -16,6 +16,7 @@ const createWindow = () => {
 
 app.whenReady().then(() => {
   ipcMain.handle('prt', () => console.log("hello"))
-  ipcMain.handle('readButtons', () => buttonFeedback())
+  ipcMain.handle('readButtons', async () => await buttonFeedback())
   createWindow()
 })
+

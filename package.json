@@ -4,13 +4,17 @@
   "description": "",
   "license": "ISC",
   "author": "",
-  "type": "module",
+  "type": "commonjs",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "devDependencies": {
-    "electron": "^36.2.1"
+    "electron": "^21.4.4"
+  },
+  "dependencies": {
+    "electron-rebuild": "^3.2.9",
+    "pigpio-client": "^1.5.2"
   }
 }
