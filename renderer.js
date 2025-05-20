@@ -30,7 +30,7 @@ async function fetchData() {
             (item) =>
                 `<div>${new Date(item.timestamp).toLocaleString(
                     "zh-Hans-CN"
-                )}</div> <br />` + item.html + `<div>👍${item.feedback.positive} | 👎${item.feedback.negative}</div>`
+                )}</div> <br />` + item.html + `<div id="feedback">👍${item.feedback.positive} | 👎${item.feedback.negative}</div>`
         );
 
         firstTreeholeRecordId = Math.min(...filteredTreeholeData.map(
@@ -96,7 +96,6 @@ function autoScroll() {
 function init() {
     let currentHtmlList = [];
 
-    const container = document.getElementById("device-emulator");
     let currentIndex = 0;
 
 	const updateContent = async () => {
@@ -104,6 +103,7 @@ function init() {
                 return;
             }
         
+	    const container = document.getElementById("device-emulator");
             container.innerHTML = currentHtmlList[currentIndex];
             window.scrollTo(0, 0); // 重置滚动到顶部
         
@@ -116,12 +116,30 @@ function init() {
         
                 // 异步独立执行按钮检测
                 (async () => {
+		    const container = document.getElementById("device-emulator");
+		    const containerEl = document.getElementById("device-emulator");
                     try {
                         const buttonStates = await window.sys.readButtons();
                         if (buttonStates === 1) {
-                            sendFeedback(id, true);
+			    // 插入提示
+                            containerEl.innerHTML += '<div id="feedbackNotice">感谢反馈</div>'
+                            
+                            // 延迟移除
+                            setTimeout(() => {
+                              const noticeEl = document.getElementById("feedbackNotice");
+                              if (noticeEl) noticeEl.remove();
+                            }, 1000);
+			    sendFeedback(id, true);
                         } else if (buttonStates === 2) {
-                            sendFeedback(id, false);
+			    // 插入提示
+                            containerEl.innerHTML += '<div id="feedbackNotice">感谢反馈</div>'
+                            
+                            // 延迟移除
+                            setTimeout(() => {
+                              const noticeEl = document.getElementById("feedbackNotice");
+                              if (noticeEl) noticeEl.remove();
+                            }, 1000);
+			    sendFeedback(id, true);
                         }
                     } catch (err) {
                         console.error("按钮读取失败", err);
@@ -140,11 +158,11 @@ function init() {
         if (JSON.stringify(htmlList) !== JSON.stringify(currentHtmlList)) {
             currentHtmlList = htmlList;
             clearInterval(updateContentInterval);
-            updateContentInterval = setInterval(updateContent, 5000);
+            updateContentInterval = setInterval(updateContent, 8000);
         }
     };
 
-    setInterval(updateFetchData, 5000);
+    setInterval(updateFetchData, 8000);
 }
 
 window.onload = () => {
