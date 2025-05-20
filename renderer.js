@@ -73,32 +73,65 @@ async function sendFeedback(id, isPositive) {
     }
 }
 
+function autoScroll() {
+    const scrollSpeed = 1; // 每次滚动的像素
+    const scrollInterval = 20; // 每多少毫秒滚动一次
+
+    const scrollDown = () => {
+      const maxScroll = document.body.scrollHeight - window.innerHeight;
+      let currentScroll = window.scrollY;
+
+      const interval = setInterval(() => {
+        if (currentScroll < maxScroll) {
+          currentScroll += scrollSpeed;
+          window.scrollTo(0, currentScroll);
+        } else {
+          clearInterval(interval); // 滚动到底后停止
+        }
+      }, scrollInterval);
+    };
+    scrollDown();
+}
+
 function init() {
     let currentHtmlList = [];
 
     const container = document.getElementById("device-emulator");
     let currentIndex = 0;
 
-    const updateContent = async () => {
-        if (currentHtmlList.length === 0) {
-            return;
-        }
-        container.innerHTML = currentHtmlList[currentIndex];
-
-        // read button states
-        if (currentIndex > bulletinListNumber - 1) {
-            console.log(firstTreeholeRecordId, currentIndex, bulletinListNumber)
-            const id = firstTreeholeRecordId + currentIndex - bulletinListNumber
-            const buttonStates = await window.sys.readButtons()
-            if (buttonStates === 1) {
-                sendFeedback(id, true)
-            } else if (buttonStates === 2) {
-                sendFeedback(id, false)
+	const updateContent = async () => {
+            if (currentHtmlList.length === 0) {
+                return;
             }
-        }
+        
+            container.innerHTML = currentHtmlList[currentIndex];
+            window.scrollTo(0, 0); // 重置滚动到顶部
+        
+            // 启动自动滚动（并行异步，不阻塞按钮检测）
+            autoScroll();
+        
+            // 启动按钮检测（不依赖滚动完成）
+            if (currentIndex >= bulletinListNumber) {
+                const id = firstTreeholeRecordId + currentIndex - bulletinListNumber;
+        
+                // 异步独立执行按钮检测
+                (async () => {
+                    try {
+                        const buttonStates = await window.sys.readButtons();
+                        if (buttonStates === 1) {
+                            sendFeedback(id, true);
+                        } else if (buttonStates === 2) {
+                            sendFeedback(id, false);
+                        }
+                    } catch (err) {
+                        console.error("按钮读取失败", err);
+                    }
+                })();
+            }
+        
+            currentIndex = (currentIndex + 1) % currentHtmlList.length;
+        };
 
-        currentIndex = (currentIndex + 1) % currentHtmlList.length;
-    };
 
     let updateContentInterval = setInterval(updateContent, 5000);
 
@@ -111,7 +144,7 @@ function init() {
         }
     };
 
-    setInterval(updateFetchData, 1000);
+    setInterval(updateFetchData, 5000);
 }
 
 window.onload = () => {

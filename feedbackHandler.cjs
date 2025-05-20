@@ -62,7 +62,7 @@ function buttonFeedback() {
         pendingResolve(0);
         pendingResolve = null;
       }
-    }, 5000);
+    }, 4000);
   });
 }
 
