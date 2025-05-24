@@ -1,5 +1,3 @@
 onlyBuiltDependencies:
   - electron
-  - epoll
   - lzma-native
-  - pigpio

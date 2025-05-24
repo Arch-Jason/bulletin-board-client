@@ -1,170 +1,213 @@
-let firstTreeholeRecordId = 0;
-let bulletinListNumber = 0;
+// renderer.js
+;(async () => {
+  //—— 全局状态 ——
+  let firstTreeholeRecordId = 0;
+  let bulletinListNumber = 0;
+  let currentHtmlList = [];
+  let currentIndex = 0;
+  let currentScrollController = null;
 
-async function fetchData() {
-    try {
-        const htmlResponse = await fetch(
-            `http://152.32.175.98:3000/api/GetLatestRecord`
-        );
-        const htmlData = await htmlResponse.json();
-        bulletinListNumber = htmlData.length;
-        const treeholeHttpResponse = await fetch(
-            `http://152.32.175.98:3000/api/GetTreeholeRecord`
-        );
+  //—— 工具函数 ——
+  const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-        const treeholeHtmlData = await treeholeHttpResponse.json();
-
-        // 获取当前日期
-        const currentDate = new Date();
-        // 计算5天前的日期
-        const fiveDaysAgo = new Date();
-        fiveDaysAgo.setDate(currentDate.getDate() - 5);
-
-        // 过滤出5天内的记录
-        const filteredTreeholeData = treeholeHtmlData.filter((item) => {
-            const itemDate = new Date(item.timestamp);
-            return itemDate >= fiveDaysAgo;
-        });
-
-        const treeholeHtmlDataList = filteredTreeholeData.map(
-            (item) =>
-                `<div>${new Date(item.timestamp).toLocaleString(
-                    "zh-Hans-CN"
-                )}</div> <br />` + item.html + `<div id="feedback">👍${item.feedback.positive} | 👎${item.feedback.negative}</div>`
-        );
-
-        firstTreeholeRecordId = Math.min(...filteredTreeholeData.map(
-            (item) => parseInt(item.id)
-        ))
-
-        return [...htmlData, ...treeholeHtmlDataList];
-    } catch (error) {
-        console.error("Error fetching data:", error);
-        return [];
-    }
-}
-
-async function sendFeedback(id, isPositive) {
-    const body = {
-        id: id,
-        isPositive: isPositive
-    };
-    console.log(id)
-
-    try {
-        const response = await fetch(
-            "http://152.32.175.98:3000/api/treeholeFeedbackInc",
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(body),
+  //—— 可取消滚动控制器 ——
+  function createScrollController() {
+    const abortController = new AbortController();
+    let scrollInterval = null;
+    
+    const controller = {
+      promise: new Promise(async (resolve) => {
+        const signal = abortController.signal;
+        
+        // 滚动逻辑
+        const startScroll = async () => {
+          const maxY = document.body.scrollHeight - window.innerHeight;
+          if (maxY <= 0) {
+            await delay(5000);
+            return resolve('complete');
+          }
+          
+          let y = window.scrollY;
+          scrollInterval = setInterval(async () => {
+            if (signal.aborted) return cleanup('aborted');
+            if (y >= maxY) {
+                await delay(3000);
+                return cleanup('complete');
             }
-        );
-
-        if (response.ok) {
-            console.log("Feedback updated successfully");
-        } else {
-            console.error("Failed to update feedback");
-        }
-    } catch (error) {
-        console.error("Error occurred:", error);
-    }
-}
-
-function autoScroll() {
-    const scrollSpeed = 1; // 每次滚动的像素
-    const scrollInterval = 20; // 每多少毫秒滚动一次
-
-    const scrollDown = () => {
-      const maxScroll = document.body.scrollHeight - window.innerHeight;
-      let currentScroll = window.scrollY;
-
-      const interval = setInterval(() => {
-        if (currentScroll < maxScroll) {
-          currentScroll += scrollSpeed;
-          window.scrollTo(0, currentScroll);
-        } else {
-          clearInterval(interval); // 滚动到底后停止
-        }
-      }, scrollInterval);
-    };
-    scrollDown();
-}
-
-function init() {
-    let currentHtmlList = [];
-
-    let currentIndex = 0;
-
-	const updateContent = async () => {
-            if (currentHtmlList.length === 0) {
-                return;
-            }
-        
-	    const container = document.getElementById("device-emulator");
-            container.innerHTML = currentHtmlList[currentIndex];
-            window.scrollTo(0, 0); // 重置滚动到顶部
-        
-            // 启动自动滚动（并行异步，不阻塞按钮检测）
-            autoScroll();
-        
-            // 启动按钮检测（不依赖滚动完成）
-            if (currentIndex >= bulletinListNumber) {
-                const id = firstTreeholeRecordId + currentIndex - bulletinListNumber;
-        
-                // 异步独立执行按钮检测
-                (async () => {
-		    const container = document.getElementById("device-emulator");
-		    const containerEl = document.getElementById("device-emulator");
-                    try {
-                        const buttonStates = await window.sys.readButtons();
-                        if (buttonStates === 1) {
-			    // 插入提示
-                            containerEl.innerHTML += '<div id="feedbackNotice">感谢反馈</div>'
-                            
-                            // 延迟移除
-                            setTimeout(() => {
-                              const noticeEl = document.getElementById("feedbackNotice");
-                              if (noticeEl) noticeEl.remove();
-                            }, 1000);
-			    sendFeedback(id, true);
-                        } else if (buttonStates === 2) {
-			    // 插入提示
-                            containerEl.innerHTML += '<div id="feedbackNotice">感谢反馈</div>'
-                            
-                            // 延迟移除
-                            setTimeout(() => {
-                              const noticeEl = document.getElementById("feedbackNotice");
-                              if (noticeEl) noticeEl.remove();
-                            }, 1000);
-			    sendFeedback(id, true);
-                        }
-                    } catch (err) {
-                        console.error("按钮读取失败", err);
-                    }
-                })();
-            }
-        
-            currentIndex = (currentIndex + 1) % currentHtmlList.length;
+            window.scrollTo(0, ++y);
+          }, 20);
         };
 
+        // 按钮监听
+        const startButtonListener = async () => {
+          try {
+            while (!signal.aborted) {
+              const state = await Promise.race([
+                window.sys.readButtons(),
+                delay(50).then(() => null)
+              ]);
+              
+              if ([3, 4, 1, 2].includes(state)) {
+                resolve({ type: 'button', state });
+                abortController.abort();
+                break;
+              }
+            }
+          } catch (err) {
+            cleanup('error');
+          }
+        };
 
-    let updateContentInterval = setInterval(updateContent, 5000);
+        // 清理逻辑
+        const cleanup = (reason) => {
+          clearInterval(scrollInterval);
+          resolve(reason);
+        };
 
-    const updateFetchData = async () => {
-        const htmlList = await fetchData();
-        if (JSON.stringify(htmlList) !== JSON.stringify(currentHtmlList)) {
-            currentHtmlList = htmlList;
-            clearInterval(updateContentInterval);
-            updateContentInterval = setInterval(updateContent, 8000);
-        }
+        startScroll();
+        startButtonListener();
+      }),
+      
+      cancel: () => {
+        abortController.abort();
+        clearInterval(scrollInterval);
+      }
     };
 
-    setInterval(updateFetchData, 8000);
-}
+    return controller;
+  }
 
-window.onload = () => {
-    init();
-};
+  //—— 数据获取 ——
+  async function fetchData() {
+    try {
+      let [bullets, holes] = await Promise.all([
+        fetch('http://152.32.175.98:3000/api/GetLatestRecord')
+          .then(res => res.json())
+          .then(data => data.map(item => 
+            `<div><h1 id="heading">公告</h1>${item}</div>`
+          )),
+        
+        fetch('http://152.32.175.98:3000/api/GetTreeholeRecord')
+          .then(res => res.json())
+          .then(data => {
+            const fiveDaysAgo = Date.now() - 5 * 86400e5;
+            return data
+              .filter((item) => {
+                const itemDate = new Date(item.timestamp);
+                return itemDate >= fiveDaysAgo;
+              });
+          })
+      ]);
+
+      bulletinListNumber = bullets.length;
+      firstTreeholeRecordId = holes.length ? Math.min(...holes.map(it => it.id)) : 0;
+      holes = holes.map(it => `
+                <div>
+                  <div id="heading">树洞</div>
+                  <div>${new Date(it.timestamp).toLocaleString('zh-Hans-CN')}</div>
+                  ${it.html}
+                  <div id="feedback">👍${it.feedback.positive} | 👎${it.feedback.negative}</div>
+                </div>
+              `);
+      
+      return [...bullets, ...holes];
+    } catch (err) {
+      console.error('数据加载失败:', err);
+      return currentHtmlList; // 保留现有数据
+    }
+  }
+
+  //—— 反馈提交 ——
+  async function sendFeedback(id, isPositive) {
+    try {
+      await fetch('http://152.32.175.98:3000/api/treeholeFeedbackInc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, isPositive })
+      });
+    } catch (err) {
+      console.error('反馈提交失败:', err);
+    }
+  }
+
+  //—— 主显示逻辑 ——
+  async function showPage() {
+    const container = document.getElementById('device-emulator');
+    
+    while (true) {
+      // 等待有效数据
+      if (!currentHtmlList.length) {
+        await delay(500);
+        continue;
+      }
+
+      // 终止前一个滚动
+      if (currentScrollController) {
+        currentScrollController.cancel();
+        await currentScrollController.promise.catch(() => {});
+      }
+
+      // 更新显示内容
+      const len = currentHtmlList.length;
+      currentIndex = (currentIndex + len) % len; // 标准化索引
+      container.innerHTML = currentHtmlList[currentIndex];
+      window.scrollTo(0, 0);
+
+      // 启动新滚动
+      currentScrollController = createScrollController();
+      
+      // 等待交互
+      const result = await currentScrollController.promise;
+
+      // 处理交互结果
+      if (result.state) {
+        switch (result.state !== 0 && result.state) {
+          case 3: // 上一页
+            currentIndex = (currentIndex - 1 + len) % len;
+            break;
+          case 4: // 下一页
+            currentIndex = (currentIndex + 1) % len;
+            break;
+          case 1: // 点赞
+          case 2: // 差评
+            if (currentIndex >= bulletinListNumber) {
+              const feedbackId = firstTreeholeRecordId + (currentIndex - bulletinListNumber);
+              await sendFeedback(feedbackId, result.state === 1);
+              
+              const feedbackEl = document.createElement('div');
+              feedbackEl.id = 'feedbackNotice';
+              feedbackEl.textContent = '感谢反馈';
+              container.appendChild(feedbackEl);
+              await delay(1000);
+              feedbackEl.remove();
+            }
+            currentIndex = (currentIndex + 1) % len;
+            break;
+        }
+      } else {
+        // 自动翻页
+        currentIndex = (currentIndex + 1) % len;
+      }
+    }
+  }
+
+  //—— 数据自动刷新 ——
+  (async () => {
+    while (true) {
+      try {
+        const newData = await fetchData();
+        if (JSON.stringify(newData) !== JSON.stringify(currentHtmlList)) {
+          currentHtmlList = newData;
+          currentIndex = 0;
+        }
+      } catch (err) {
+        console.error('数据刷新失败:', err);
+      }
+      await delay(8000);
+    }
+  })();
+
+  //—— 初始化 ——
+  currentHtmlList = await fetchData();
+  showPage().catch(err => console.error('主循环异常:', err));
+})();

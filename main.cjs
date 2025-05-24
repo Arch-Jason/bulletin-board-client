@@ -28,7 +28,8 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('prt', () => console.log("hello"));
-  ipcMain.handle('readButtons', async () => await buttonFeedback());
+  // ipcMain.handle('readButtons', async () => await buttonFeedback());
+  ipcMain.handle('readButtons', () => buttonFeedback());
   createWindow();
 });
 
