@@ -90,10 +90,13 @@
         fetch('http://152.32.175.98:3000/api/GetTreeholeRecord')
           .then(res => res.json())
           .then(data => {
-            const fiveDaysAgo = Date.now() - 5 * 86400e5;
+            let fiveDaysAgo = new Date();
+            fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+            fiveDaysAgo = fiveDaysAgo.getTime();
             return data
               .filter((item) => {
-                const itemDate = new Date(item.timestamp);
+                const itemDate = (new Date(item.timestamp)).getTime();
+                console.log(itemDate, fiveDaysAgo);
                 return itemDate >= fiveDaysAgo;
               });
           })
